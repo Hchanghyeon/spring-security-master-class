@@ -16,8 +16,7 @@ public class SecurityConfiguration {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .authorizeHttpRequests((authz) -> authz
-                        .requestMatchers("/assets/**").permitAll()
+                .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/me").hasAnyRole("USER", "ADMIN")
                         .anyRequest().permitAll()
                 )
@@ -26,10 +25,14 @@ public class SecurityConfiguration {
                         .permitAll()
                 )
                 .logout(logout -> logout
+                        .logoutUrl("/logout")
                         .logoutSuccessUrl("/")
                 )
                 .rememberMe(remember -> remember
                         .tokenValiditySeconds(300)
+                )
+                .requiresChannel(channel -> channel
+                        .anyRequest().requiresSecure()
                 );
 
         return http.build();

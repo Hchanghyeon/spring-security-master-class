@@ -1,18 +1,26 @@
 package com.prgrms.devcourse.configures;
 
+import javax.sql.DataSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
 public class SecurityConfiguration {
+
+    private DataSource dataSource;
+
+    @Autowired
+    private void setDataSource(DataSource dataSource) {
+        this.dataSource = dataSource;
+    }
+
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -45,22 +53,30 @@ public class SecurityConfiguration {
         return http.build();
     }
 
-    @Bean
-    public UserDetailsService user() {
+    @Autowired
+    public void jdbcAuthentication(AuthenticationManagerBuilder auth) throws Exception {
 
-        UserDetails user = User.builder()
-                .username("user")
-                .password("{bcrypt}$2a$10$cv9M.jN4GgWUv0pFcCIHS.jpIpY7uFY8VnLos/8nZphaMItuRn/Hy")
-                .roles("USER")
-                .build();
-
-        UserDetails admin = User.builder()
-                .username("admin")
-                .password("{bcrypt}$2a$10$75U1BZoGlw9VD43KsZQ9e.NmJyL4OEMaT0oE.LT6rvsI6NaHxV21m")
-                .roles("ADMIN")
-                .build();
-
-        return new InMemoryUserDetailsManager(user, admin);
+        auth.jdbcAuthentication()
+                .dataSource(dataSource)
+                .passwordEncoder(new BCryptPasswordEncoder())
+                .usersByUsernameQuery(
+                        "SELECT " +
+                                "login_id, passwd, true " +
+                                "FROM " +
+                                "users " +
+                                "WHERE " +
+                                "login_id = ?"
+                )
+                .groupAuthoritiesByUsername(
+                        "SELECT " +
+                                "u.login_id, g.name, p.name " +
+                                "FROM " +
+                                "users u JOIN groups g ON u.group_id = g.id " +
+                                "LEFT JOIN group_permission gp ON g.id = gp.group_id " +
+                                "JOIN permissions p ON p.id = gp.permission_id " +
+                                "WHERE " +
+                                "u.login_id = ?"
+                )
+                .getUserDetailsService().setEnableAuthorities(false);
     }
-
 }
